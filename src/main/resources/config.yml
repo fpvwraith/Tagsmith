@@ -1,0 +1,66 @@
+# ---------------------------------------------------------------------------
+# Tagsmith
+#
+# The scan runs while the server is starting, BEFORE any world is loaded, so
+# the region / player files are not in use and nobody can join mid-scan.
+# When it finishes successfully, run-on-next-startup is set back to false.
+# To run it again: set it to true (or use /tagsmith arm) and restart.
+# ---------------------------------------------------------------------------
+run-on-next-startup: true
+
+# true = scan and write the report, but do not change any files.
+dry-run: false
+
+# Copy every file before it is modified into plugins/Tagsmith/backups/<timestamp>/.
+# Only files that actually change are copied. Still take a full backup first!
+backup-modified-files: true
+
+# Worker threads. 0 = one per CPU core.
+threads: 0
+
+# Directories to scan, relative to the server root (the world container).
+# *.mca files are treated as region files, *.dat files as player data.
+paths:
+  - world/playerdata
+  - world/region
+  - world/entities
+  - world_nether/DIM-1/region
+  - world_nether/DIM-1/entities
+  - world_the_end/DIM1/region
+  - world_the_end/DIM1/entities
+
+rules:
+  # Items that lose their minecraft:max_stack_size component and get their count set to 1.
+  stack-size-items:
+    - minecraft:totem_of_undying
+    - minecraft:bundle
+    - minecraft:white_bundle
+    - minecraft:orange_bundle
+    - minecraft:magenta_bundle
+    - minecraft:light_blue_bundle
+    - minecraft:yellow_bundle
+    - minecraft:lime_bundle
+    - minecraft:pink_bundle
+    - minecraft:gray_bundle
+    - minecraft:light_gray_bundle
+    - minecraft:cyan_bundle
+    - minecraft:purple_bundle
+    - minecraft:blue_bundle
+    - minecraft:brown_bundle
+    - minecraft:green_bundle
+    - minecraft:red_bundle
+    - minecraft:black_bundle
+
+  # Any enchantment with a level ABOVE max-level is set to reduced-level.
+  enchantments:
+    max-level: 18
+    reduced-level: 10
+    # Also apply to minecraft:stored_enchantments (enchanted books).
+    include-stored-enchantments: true
+
+  remove-unbreakable: true
+  remove-attribute-modifiers: true
+
+  # Also fix items still in the pre-1.20.5 format (tag.Enchantments, tag.Unbreakable, ...)
+  # inside chunks that have not been loaded (and therefore upgraded) since then.
+  fix-legacy-format: true

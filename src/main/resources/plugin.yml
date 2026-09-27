@@ -1,0 +1,13 @@
+name: Tagsmith
+version: '${version}'
+main: com.tagsmith.Tagsmith
+api-version: '1.21'
+description: Offline scan of player, block entity and entity data that strips illegal item components.
+commands:
+  tagsmith:
+    description: Arm or disarm the Tagsmith scan for the next server startup.
+    usage: /tagsmith <arm|disarm|status>
+    permission: tagsmith.admin
+permissions:
+  tagsmith.admin:
+    default: op
