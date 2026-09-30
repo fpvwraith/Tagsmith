@@ -30,8 +30,29 @@ public final class ItemFixer {
             boolean includeStoredEnchantments,
             boolean removeUnbreakable,
             boolean removeAttributeModifiers,
-            boolean fixLegacyFormat
+            boolean fixLegacyFormat,
+            PotionRules potionRules
     ) {}
+
+    /**
+     * Custom potion effect amplifiers above {@code maxAmplifier} (or the effect's override) or below 0
+     * are set to {@code replacementAmplifier}. Override keys are full effect ids, e.g. minecraft:resistance.
+     */
+    public record PotionRules(
+            boolean enabled,
+            int maxAmplifier,
+            int replacementAmplifier,
+            Map<String, Integer> maxAmplifierOverrides
+    ) {}
+
+    /** Numeric effect ids used by the pre-1.20.2 CustomPotionEffects format. */
+    private static final String[] LEGACY_EFFECT_IDS = {
+            null, "speed", "slowness", "haste", "mining_fatigue", "strength", "instant_health", "instant_damage",
+            "jump_boost", "nausea", "regeneration", "resistance", "fire_resistance", "water_breathing",
+            "invisibility", "blindness", "night_vision", "hunger", "weakness", "poison", "wither", "health_boost",
+            "absorption", "saturation", "glowing", "levitation", "luck", "unluck", "slow_falling",
+            "conduit_power", "dolphins_grace", "bad_omen", "hero_of_the_village", "darkness"
+    };
 
     private final Settings settings;
     private final byte[][] prefilterPatterns;
@@ -48,6 +69,11 @@ public final class ItemFixer {
         if (settings.removeAttributeModifiers()) {
             patterns.add("attribute_modifiers");
             patterns.add("AttributeModifiers");
+        }
+        if (settings.potionRules().enabled()) {
+            patterns.add("custom_effects");        // 1.20.5+ potion_contents
+            patterns.add("custom_potion_effects"); // 1.20.2 - 1.20.4
+            patterns.add("CustomPotionEffects");   // older
         }
         this.prefilterPatterns = patterns.stream()
                 .map(p -> p.getBytes(StandardCharsets.US_ASCII))
@@ -152,6 +178,11 @@ public final class ItemFixer {
                     actions.add("removed attribute_modifiers");
                     stats.attributeModifiersRemoved.increment();
                 }
+                // 5. Custom potion effect amplifiers (potions, splash/lingering potions, tipped arrows).
+                if (settings.potionRules().enabled()
+                        && getComponent(components, "potion_contents") instanceof CompoundTag contents) {
+                    fixEffectList(contents.getList("custom_effects"), "id", "amplifier", actions);
+                }
             }
 
             // Pre-1.20.5 item format, found in chunks that haven't been loaded since the upgrade.
@@ -168,6 +199,10 @@ public final class ItemFixer {
                 if (settings.removeAttributeModifiers() && legacy.remove("AttributeModifiers") != null) {
                     actions.add("removed legacy AttributeModifiers");
                     stats.attributeModifiersRemoved.increment();
+                }
+                if (settings.potionRules().enabled()) {
+                    fixEffectList(legacy.getList("custom_potion_effects"), "id", "amplifier", actions); // 1.20.2 - 1.20.4
+                    fixEffectList(legacy.getList("CustomPotionEffects"), "Id", "Amplifier", actions);   // older
                 }
             }
 
@@ -199,6 +234,25 @@ public final class ItemFixer {
                     entry.setValue(Tag.numericOfSameType(level, settings.reducedEnchantLevel()));
                     stats.enchantmentsReduced.increment();
                 }
+            }
+        }
+
+        private void fixEffectList(ListTag effects, String idKey, String amplifierKey, List<String> actions) {
+            if (effects == null) return;
+            PotionRules rules = settings.potionRules();
+            for (Tag element : effects.values()) {
+                if (!(element instanceof CompoundTag effect)) continue;
+                Tag amplifier = effect.get(amplifierKey); // absent means 0
+                if (amplifier == null || !Tag.isNumeric(amplifier)) continue;
+                // The game stores the amplifier as an unsigned byte, so -1b means 255.
+                long value = amplifier instanceof Tag.ByteTag b ? Byte.toUnsignedInt(b.value()) : (long) Tag.asDouble(amplifier);
+                String effectId = effectId(effect.get(idKey));
+                int max = effectId == null ? rules.maxAmplifier()
+                        : rules.maxAmplifierOverrides().getOrDefault(effectId, rules.maxAmplifier());
+                if (value >= 0 && value <= max) continue;
+                actions.add("effect " + effectId + " amplifier " + value + " -> " + rules.replacementAmplifier());
+                effect.put(amplifierKey, Tag.numericOfSameType(amplifier, rules.replacementAmplifier()));
+                stats.potionAmplifiersReduced.increment();
             }
         }
 
@@ -239,6 +293,18 @@ public final class ItemFixer {
             return String.format(Locale.ROOT, "{%s @ %.1f %.1f %.1f}", id,
                     Tag.asDouble(pos.values().get(0)), Tag.asDouble(pos.values().get(1)),
                     Tag.asDouble(pos.values().get(2)));
+        }
+        return null;
+    }
+
+    private static String effectId(Tag id) {
+        if (id instanceof Tag.StringTag s) {
+            String value = s.value().toLowerCase(Locale.ROOT);
+            return value.contains(":") ? value : "minecraft:" + value;
+        }
+        if (id != null && Tag.isNumeric(id)) {
+            int n = (int) Tag.asDouble(id);
+            if (n > 0 && n < LEGACY_EFFECT_IDS.length) return "minecraft:" + LEGACY_EFFECT_IDS[n];
         }
         return null;
     }

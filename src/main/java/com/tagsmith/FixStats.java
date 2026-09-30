@@ -19,4 +19,5 @@ public final class FixStats {
     public final LongAdder enchantmentsReduced = new LongAdder();
     public final LongAdder unbreakableRemoved = new LongAdder();
     public final LongAdder attributeModifiersRemoved = new LongAdder();
+    public final LongAdder potionAmplifiersReduced = new LongAdder();
 }

@@ -7,6 +7,7 @@ A Paper/Purpur 1.21.11 plugin that scans all player data, block entity data and 
 - Enchantments above level 18 are set to level 10 (stored enchantments on books too)
 - `unbreakable` is removed
 - `attribute_modifiers` is removed
+- Custom potion effect amplifiers outside 0–14 are set to 3 (for resistance, outside 0–3 → 3)
 
 ## Usage
 1. Back up your worlds.

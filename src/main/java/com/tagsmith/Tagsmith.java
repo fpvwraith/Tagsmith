@@ -3,11 +3,14 @@ package com.tagsmith;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 
@@ -39,7 +42,12 @@ public final class Tagsmith extends JavaPlugin {
                 config.getBoolean("rules.enchantments.include-stored-enchantments", true),
                 config.getBoolean("rules.remove-unbreakable", true),
                 config.getBoolean("rules.remove-attribute-modifiers", true),
-                config.getBoolean("rules.fix-legacy-format", true));
+                config.getBoolean("rules.fix-legacy-format", true),
+                new ItemFixer.PotionRules(
+                        config.getBoolean("rules.potion-effects.enabled", true),
+                        config.getInt("rules.potion-effects.max-amplifier", 14),
+                        config.getInt("rules.potion-effects.replacement-amplifier", 3),
+                        amplifierOverrides(config.getConfigurationSection("rules.potion-effects.max-amplifier-overrides"))));
 
         List<String> paths = config.getStringList("paths");
         boolean dryRun = config.getBoolean("dry-run", false);
@@ -85,6 +93,16 @@ public final class Tagsmith extends JavaPlugin {
             }
         }
         return true;
+    }
+
+    private static Map<String, Integer> amplifierOverrides(ConfigurationSection section) {
+        Map<String, Integer> out = new HashMap<>();
+        if (section == null) return out;
+        for (String key : section.getKeys(false)) {
+            String id = key.trim().toLowerCase();
+            out.put(id.contains(":") ? id : "minecraft:" + id, section.getInt(key));
+        }
+        return out;
     }
 
     private static Set<String> normalizeIds(List<String> ids) {

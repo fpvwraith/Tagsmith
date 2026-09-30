@@ -20,7 +20,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class ScanTest {
 
     static final ItemFixer.Settings SETTINGS = new ItemFixer.Settings(
-            Set.of("minecraft:totem_of_undying", "minecraft:bundle"), 18, 10, true, true, true, true);
+            Set.of("minecraft:totem_of_undying", "minecraft:bundle"), 18, 10, true, true, true, true,
+            new ItemFixer.PotionRules(true, 14, 3, java.util.Map.of("minecraft:resistance", 3)));
 
     // ---------- helpers ----------
 
@@ -230,6 +231,49 @@ class ScanTest {
         assertArrayEquals(noise, ((ByteArrayTag) fixed.get("blob")).value());
         byte[] r = Files.readAllBytes(regionDir.resolve("r.1.0.mca"));
         assertEquals((byte) (Compression.ZLIB | 0x80), r[8196]);
+    }
+
+    static CompoundTag effect(String id, byte amplifier) {
+        return compound("id", s(id), "amplifier", new ByteTag(amplifier), "duration", i(600));
+    }
+
+    static int amplifier(Tag effect) {
+        return Byte.toUnsignedInt(((ByteTag) ((CompoundTag) effect).get("amplifier")).value());
+    }
+
+    @Test
+    void clampsCustomPotionEffectAmplifiers(@TempDir Path root) throws Exception {
+        Path players = Files.createDirectories(root.resolve("world/playerdata"));
+        CompoundTag potion = item("minecraft:splash_potion", 1, compound("minecraft:potion_contents", compound(
+                "custom_effects", list(Tag.COMPOUND,
+                        effect("minecraft:strength", (byte) 14),     // at limit: kept
+                        effect("minecraft:strength", (byte) 15),     // -> 3
+                        effect("minecraft:speed", (byte) -1),        // 255 -> 3
+                        effect("minecraft:resistance", (byte) 3),    // at resistance limit: kept
+                        effect("minecraft:resistance", (byte) 4),    // -> 3
+                        effect("minecraft:regeneration", (byte) 0),  // kept
+                        compound("id", s("minecraft:haste"), "duration", i(20)))))); // no amplifier (= 0): kept
+        CompoundTag legacyArrow = compound("id", s("minecraft:tipped_arrow"), "Count", new ByteTag((byte) 1),
+                "tag", compound("CustomPotionEffects", list(Tag.COMPOUND,
+                        compound("Id", new ByteTag((byte) 11), "Amplifier", new ByteTag((byte) 100)),    // resistance -> 3
+                        compound("Id", new ByteTag((byte) 5), "Amplifier", new ByteTag((byte) 10)))));  // strength: kept
+        CompoundTag player = compound("Inventory", list(Tag.COMPOUND, withSlot(potion, 0), withSlot(legacyArrow, 1)));
+        Path dat = players.resolve("11111111-1111-1111-1111-111111111111.dat");
+        Files.write(dat, Compression.compress(Compression.GZIP, NbtIO.write(new NbtIO.Root("", player))));
+
+        assertTrue(ScanRunner.run(options(root, false), Logger.getAnonymousLogger()));
+
+        CompoundTag p = NbtIO.read(Compression.decompress(Compression.GZIP, Files.readAllBytes(dat), 0, (int) Files.size(dat))).tag();
+        List<Tag> effects = ((CompoundTag) p.getList("Inventory").values().get(0)).getCompound("components")
+                .getCompound("minecraft:potion_contents").getList("custom_effects").values();
+        assertEquals(List.of(14, 3, 3, 3, 3, 0), effects.subList(0, 6).stream().map(ScanTest::amplifier).toList());
+        assertNull(((CompoundTag) effects.get(6)).get("amplifier"));
+        assertEquals(600, ((IntTag) ((CompoundTag) effects.get(1)).get("duration")).value());
+
+        List<Tag> legacy = ((CompoundTag) p.getList("Inventory").values().get(1)).getCompound("tag")
+                .getList("CustomPotionEffects").values();
+        assertEquals(3, ((ByteTag) ((CompoundTag) legacy.get(0)).get("Amplifier")).value());
+        assertEquals(10, ((ByteTag) ((CompoundTag) legacy.get(1)).get("Amplifier")).value());
     }
 
     static CompoundTag withSlot(CompoundTag item, int slot) {

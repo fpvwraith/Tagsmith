@@ -178,11 +178,13 @@ public final class ScanRunner {
                   enchantment levels reduced:  %d
                   unbreakable removed:         %d
                   attribute_modifiers removed: %d
+                  potion amplifiers reduced:   %d
                 """,
                 dryRun ? "dry run finished" : "finished", formatSeconds(took.toMillis() / 1000.0),
                 s.filesScanned.sum(), dryRun ? "would modify" : "modified", s.filesModified.sum(), s.filesFailed.sum(),
                 s.chunksScanned.sum(), s.chunksParsed.sum(), s.chunksModified.sum(), s.chunksFailed.sum(),
                 s.itemsModified.sum(), s.maxStackSizeRemoved.sum(), s.countsReduced.sum(),
-                s.enchantmentsReduced.sum(), s.unbreakableRemoved.sum(), s.attributeModifiersRemoved.sum());
+                s.enchantmentsReduced.sum(), s.unbreakableRemoved.sum(), s.attributeModifiersRemoved.sum(),
+                s.potionAmplifiersReduced.sum());
     }
 }

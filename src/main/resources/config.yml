@@ -61,6 +61,17 @@ rules:
   remove-unbreakable: true
   remove-attribute-modifiers: true
 
+  # Custom potion effects (potions, splash/lingering potions, tipped arrows).
+  # An amplifier outside 0..max-amplifier is set to replacement-amplifier.
+  # (Amplifier 0 = level I, so 3 = level IV.)
+  potion-effects:
+    enabled: true
+    max-amplifier: 14
+    replacement-amplifier: 3
+    # Per-effect limits that replace max-amplifier.
+    max-amplifier-overrides:
+      minecraft:resistance: 3
+
   # Also fix items still in the pre-1.20.5 format (tag.Enchantments, tag.Unbreakable, ...)
   # inside chunks that have not been loaded (and therefore upgraded) since then.
   fix-legacy-format: true
